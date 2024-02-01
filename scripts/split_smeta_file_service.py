@@ -24,6 +24,14 @@ def get_company_name_from_file_name(file_name) -> list or str:
         return Exception(f"Ошибка при получении названия компании из названия файла: {e}")
 
 
+def get_saved_files(file):
+    """ Получает список сохраненных файлов """
+
+    saved_files = [file]
+
+    return saved_files
+
+
 def save_file(company_name, doc_part, input_file_path, output_folder):
     """ Сохраняет файл """
 
@@ -33,6 +41,8 @@ def save_file(company_name, doc_part, input_file_path, output_folder):
     file_name = re.sub(r"[A-Z]{3}_[A-Za-z]+", company_name, input_file_path)
     file_path = f"{file_name}"
     doc_part.save(file_path)
+    saved_files = get_saved_files(file_path)
+    return saved_files
 
 
 def split_docx_by_paragraph(input_file_path, output_folder):
@@ -58,6 +68,7 @@ def split_docx_by_paragraph(input_file_path, output_folder):
     except Exception as e:
         return Exception(e)
 
+    first_file = None
     for idx in range(len(split_indexes) - 1):
         start_index = split_indexes[idx]
         end_index = split_indexes[idx + 1]
@@ -66,16 +77,16 @@ def split_docx_by_paragraph(input_file_path, output_folder):
         for element in document.element.body[start_index:end_index + 1]:
             doc_part.element.body.append(element)
 
-        filename = f"{company_names[idx]}_part{idx + 1}.docx"
-        save_file(company_names[idx], doc_part, input_file_path, output_folder)
+        first_file = save_file(company_names[idx], doc_part, input_file_path, output_folder)
 
     last_part_start_index = split_indexes[-1]
     doc_last_part = Document()
     for element in document.element.body[last_part_start_index:]:
         doc_last_part.element.body.append(element)
 
-    last_filename = f"{company_names[-1]}_part{len(split_indexes)}.docx"
-    save_file(company_names[-1], doc_last_part, input_file_path, output_folder)
+    last_file = save_file(company_names[-1], doc_last_part, input_file_path, output_folder)
+
+    return [first_file, last_file]
 
 
 def main():

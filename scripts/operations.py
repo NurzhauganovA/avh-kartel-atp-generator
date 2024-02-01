@@ -171,9 +171,9 @@ def get_orders(project: Project) -> dict:
                 "BS_NUMBER": multi_BS_NUMBER[i],
                 "BS_NAME": multi_BS_NAME[i],
                 "BS_ADDRESS": multi_BS_ADDRESS[i],
-                "ORDER_REGION": multi_ORDER_REGION[i] if len(multi_ORDER_REGION) > 0 else "",
-                "ORDER_MANAGER": multi_ORDER_MANAGER[i] if len(multi_ORDER_MANAGER) > 0 else "",
-                "ORDER_NUMBER": multi_ORDER_NUMBER[i] if len(multi_ORDER_NUMBER) > 0 else "",
+                "ORDER_REGION": multi_ORDER_REGION[i],
+                "ORDER_MANAGER": multi_ORDER_MANAGER[i],
+                "ORDER_NUMBER": multi_ORDER_NUMBER[i],
                 "ORDER_DATE": multi_ORDER_DATE[i],
                 "TOTAL_SUMM": multi_TOTAL_SUMM[i],
                 "TOTAL_NDS": multi_TOTAL_NDS[i],
@@ -182,7 +182,7 @@ def get_orders(project: Project) -> dict:
                 "ORDER_DOGOVOR_NUMBER": const_ORDER_DOGOVOR_NUMBER,
                 "ORDER_DOGOVOR_DATE": const_ORDER_DOGOVOR_DATE,
                 "TABLE": multi_TABLE[i],
-                "ORDER_MANAGER_POSITION": multi_ORDER_MANAGER_POSITION[i] if len(multi_ORDER_MANAGER_POSITION) > 0 else "",
+                "ORDER_MANAGER_POSITION": multi_ORDER_MANAGER_POSITION[i],
                 "TYPE_OF_WORK": type_of_work,
             }
             result.append(data)
@@ -510,30 +510,23 @@ def get_smeta(order):
 
     if files:
         for file in files:
-            if file.endswith('.docx'):
+            if file.endswith('.docx') and "смета" in file.lower() and order['BS_NAME'] in file.lower():
                 not_used_smeta_files.append(f'{folder}/{file}')
 
-    print("not_used_smeta_files", not_used_smeta_files)
-
+    splited_files = []
     for file in not_used_smeta_files:
-        if "смета" in file.lower():
-            split_docx_by_paragraph(file, folder)
+        if "смета" in file.lower() and order['BS_NAME'] in file.lower() and file.endswith('.docx'):
+            splited_files = split_docx_by_paragraph(file, folder)
+            break
 
     if len(not_used_smeta_files) == 0:
         send_message("Для заказа требуется смета которую не нашел в папке. Пожалуйста добавьте смету в папку")
         return []
 
-    not_used_smeta_files = [file for file in not_used_smeta_files if "смета" in file.lower()]
-    print("not_used_smeta_files", not_used_smeta_files)
+    if len(splited_files) == 0:
+        return not_used_smeta_files
 
-    new_smeta_files = [file for file in not_used_smeta_files if order['BS_NAME'] in file and order['TYPE_OF_WORK'] in file]
-    print("new_smeta_files", new_smeta_files)
-
-    if len(new_smeta_files) == 0:
-        new_smeta_files = not_used_smeta_files
-
-    print("new_smeta_files", new_smeta_files)
-    return new_smeta_files
+    return [file for sublist in splited_files for file in sublist if file not in not_used_smeta_files]
 
 
 def ADD_END(typez, input_path, output_path, data):
@@ -560,10 +553,7 @@ def create_files(folder, data, tmpl_type, have_smeta=False, index=""):
         except:
             data['BS_ADDRESS'] = BS_ADDRESSx
 
-    smeta_paths = []
-    if have_smeta:
-        smeta_paths = get_smeta(data) if len(get_smeta(data)) > 0 else [""]
-    print("smeta_paths", smeta_paths)
+    smeta_paths = get_smeta(data) if len(get_smeta(data)) > 0 else [""]
 
     for smeta_path in smeta_paths:
         if "atp" in tmpl_type:
@@ -572,16 +562,7 @@ def create_files(folder, data, tmpl_type, have_smeta=False, index=""):
             file_name__ATP = get_FILE_NAME("АТП", data['BS_NAME'], data['TYPE_OF_WORK'], index=index)
             output_path = folder + "/" + file_name__ATP + ".docx"
             template_ATP.save(output_path)
-            if smeta_path != "":
+            if smeta_path != "" and data['BS_NAME'] in smeta_path:
                 combine_docx(output_path, smeta_path, output_path, is_second=False, is_atp=False)
-            ADD_END("atp", output_path, output_path, data)
-
-        if "avr" in tmpl_type:
-            template_AVR = DocxTemplate("templates/ШАБЛОН АВР.docx")
-            template_AVR.render(data)
-            file_name__AVR = get_FILE_NAME("АВР", data['BS_NAME'], data['TYPE_OF_WORK'], index=index)
-            output_path = folder + "/" + file_name__AVR + ".docx"
-            template_AVR.save(output_path)
-            if smeta_path != "":
-                combine_docx(output_path, smeta_path, output_path, is_second=False, is_atp=False)
-            ADD_END("avr", output_path, output_path, data)
+                break
+            ADD_END("ATP", output_path, output_path, data)

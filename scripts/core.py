@@ -134,8 +134,6 @@ def generate(tmpl_type: str, project):
     if orders['status'] == -1:
         return
 
-    # print(orders['result'])
-
     for index, order in enumerate(orders['result']):
 
         if len(orders['result']) == 1:
@@ -148,7 +146,6 @@ def generate(tmpl_type: str, project):
         if "atp" == tmpl_type:  # type: ignore
             create_files(data=order, folder=get_work_folder(), tmpl_type=tmpl_type, have_smeta=have_smeta,
                          index=index)  # type: ignore
-
         elif "avr" == tmpl_type:  # type: ignore
             create_files(data=order, folder=get_work_folder(), tmpl_type=tmpl_type, have_smeta=have_smeta,
                          index=index)  # type: ignore
