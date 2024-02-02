@@ -38,8 +38,8 @@ def save_file(company_name, doc_part, input_file_path, output_folder):
     if company_name in input_file_path:
         input_file_path = input_file_path.replace(company_name, "").replace(", ", '')
 
-    file_name = re.sub(r"[A-Z]{3}_[A-Za-z]+", company_name, input_file_path)
-    file_path = f"{file_name}"
+    file_path = f"{output_folder}/{company_name}.docx"
+    print("file_path", file_path)
     doc_part.save(file_path)
     saved_files = get_saved_files(file_path)
     return saved_files
@@ -57,7 +57,7 @@ def split_docx_by_paragraph(input_file_path, output_folder):
 
                     text = re.sub(r"\s+", " ", text)
                     text = text.replace('"', '')
-                    if "СВОДНЫЙ СМЕТНЫЙ РАСЧЕТ СТОИМОСТИ СТРОИТЕЛЬСТВА" in text and i not in split_indexes:
+                    if "СВОДНЫЙ СМЕТНЫЙ РАСЧЕТ СТОИМОСТИ СТРОИТЕЛЬСТВА" in text or "СМЕТНЫЙ РАСЧЕТ СТОИМОСТИ СТРОИТЕЛЬСТВА" in text and i not in split_indexes:
                         split_indexes.append(i)
 
     if len(split_indexes) == 0:
@@ -77,7 +77,10 @@ def split_docx_by_paragraph(input_file_path, output_folder):
         for element in document.element.body[start_index:end_index + 1]:
             doc_part.element.body.append(element)
 
-        first_file = save_file(company_names[idx], doc_part, input_file_path, output_folder)
+        try:
+            first_file = save_file(company_names[idx], doc_part, input_file_path, output_folder)
+        except IndexError:
+            first_file = save_file(company_names[0], doc_part, input_file_path, output_folder)
 
     last_part_start_index = split_indexes[-1]
     doc_last_part = Document()
@@ -87,11 +90,3 @@ def split_docx_by_paragraph(input_file_path, output_folder):
     last_file = save_file(company_names[-1], doc_last_part, input_file_path, output_folder)
 
     return [first_file, last_file]
-
-
-def main():
-    """ Точка входа """
-
-    file_name = "Смета (стр-ка)_2БС_ALM_Itzhon, ALM_Sarybulak_AVS (1).docx"
-    output_folder = "output"
-    split_docx_by_paragraph(file_name, output_folder)

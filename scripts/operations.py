@@ -15,7 +15,7 @@ from docx.enum.section import WD_ORIENT  # type: ignore
 from scripts.models import Project
 from datetime import datetime
 
-from scripts.split_smeta_file_service import split_docx_by_paragraph
+from scripts.split_smeta_file_service import split_docx_by_paragraph, get_company_name_from_file_name
 
 
 def log_text(text) -> None:
@@ -168,22 +168,22 @@ def get_orders(project: Project) -> dict:
                     type_of_work = get_TYPE_OF_WORK(html_file_path)[0]
 
             data = {
-                "BS_NUMBER": multi_BS_NUMBER[i],
-                "BS_NAME": multi_BS_NAME[i],
-                "BS_ADDRESS": multi_BS_ADDRESS[i],
-                "ORDER_REGION": multi_ORDER_REGION[i],
-                "ORDER_MANAGER": multi_ORDER_MANAGER[i],
-                "ORDER_NUMBER": multi_ORDER_NUMBER[i],
-                "ORDER_DATE": multi_ORDER_DATE[i],
-                "TOTAL_SUMM": multi_TOTAL_SUMM[i],
-                "TOTAL_NDS": multi_TOTAL_NDS[i],
-                "TOTAL_SUMM_NDS": multi_TOTAL_SUMM_NDS[i],
-                "TOTAL_SUMM_NDS_WORD": multi_TOTAL_SUMM_NDS_WORD[i],
-                "ORDER_DOGOVOR_NUMBER": const_ORDER_DOGOVOR_NUMBER,
-                "ORDER_DOGOVOR_DATE": const_ORDER_DOGOVOR_DATE,
-                "TABLE": multi_TABLE[i],
-                "ORDER_MANAGER_POSITION": multi_ORDER_MANAGER_POSITION[i],
-                "TYPE_OF_WORK": type_of_work,
+                "BS_NUMBER": multi_BS_NUMBER[i] if len(multi_BS_NUMBER) > i else "",
+                "BS_NAME": multi_BS_NAME[i] if len(multi_BS_NAME) > i else "",
+                "BS_ADDRESS": multi_BS_ADDRESS[i] if len(multi_BS_ADDRESS) > i else "",
+                "ORDER_REGION": multi_ORDER_REGION[i] if len(multi_ORDER_REGION) > i else "",
+                "ORDER_MANAGER": multi_ORDER_MANAGER[i] if len(multi_ORDER_MANAGER) > i else "",
+                "ORDER_NUMBER": multi_ORDER_NUMBER[i] if len(multi_ORDER_NUMBER) > i else "",
+                "ORDER_DATE": multi_ORDER_DATE[i] if len(multi_ORDER_DATE) > i else "",
+                "TOTAL_SUMM": multi_TOTAL_SUMM[i] if len(multi_TOTAL_SUMM) > i else "",
+                "TOTAL_NDS": multi_TOTAL_NDS[i] if len(multi_TOTAL_NDS) > i else "",
+                "TOTAL_SUMM_NDS": multi_TOTAL_SUMM_NDS[i] if len(multi_TOTAL_SUMM_NDS) > i else "",
+                "TOTAL_SUMM_NDS_WORD": multi_TOTAL_SUMM_NDS_WORD[i] if len(multi_TOTAL_SUMM_NDS_WORD) > i else "",
+                "ORDER_DOGOVOR_NUMBER": const_ORDER_DOGOVOR_NUMBER if const_ORDER_DOGOVOR_NUMBER else "",
+                "ORDER_DOGOVOR_DATE": const_ORDER_DOGOVOR_DATE if const_ORDER_DOGOVOR_DATE else "",
+                "TABLE": multi_TABLE[i] if len(multi_TABLE) > i else "",
+                "ORDER_MANAGER_POSITION": multi_ORDER_MANAGER_POSITION[i] if len(multi_ORDER_MANAGER_POSITION) > i else "",
+                "TYPE_OF_WORK": type_of_work if type_of_work else "",
             }
             result.append(data)
     except:
@@ -498,6 +498,7 @@ def combine_docx(file1, file2, output_file, is_second=False, is_atp=False):
 
 def get_smeta(order):
     # открыть папку
+
     folder = get_work_folder()
     if folder is None:
         return {"status": -1}
@@ -507,26 +508,31 @@ def get_smeta(order):
 
     # найти docx файлы
     not_used_smeta_files = []
+    companies = []
 
     if files:
         for file in files:
-            if file.endswith('.docx') and "смета" in file.lower() and order['BS_NAME'] in file.lower():
-                not_used_smeta_files.append(f'{folder}/{file}')
+            if file.endswith('.docx'):
+                if "Смета" in str(file) or "смета" in str(file) or "заказ" in str(file.lower()):
+                    not_used_smeta_files.append(f'{folder}/{file}')
+                    companies.append(get_company_name_from_file_name(file))
 
     splited_files = []
-    for file in not_used_smeta_files:
-        if "смета" in file.lower() and order['BS_NAME'] in file.lower() and file.endswith('.docx'):
-            splited_files = split_docx_by_paragraph(file, folder)
-            break
 
-    if len(not_used_smeta_files) == 0:
+    if len(companies) >= 1 and len(companies[0]) > 1:
+        for file in not_used_smeta_files:
+            if "смета" in file.lower() and file.endswith('.docx'):
+                splited_files = split_docx_by_paragraph(file, folder)
+                break
+
+    if len(not_used_smeta_files) == 0 and get_have_smeta(order) is True:
         send_message("Для заказа требуется смета которую не нашел в папке. Пожалуйста добавьте смету в папку")
         return []
 
     if len(splited_files) == 0:
         return not_used_smeta_files
 
-    return [file for sublist in splited_files for file in sublist if file not in not_used_smeta_files]
+    return [file for sublist in splited_files for file in sublist]
 
 
 def ADD_END(typez, input_path, output_path, data):
@@ -554,6 +560,7 @@ def create_files(folder, data, tmpl_type, have_smeta=False, index=""):
             data['BS_ADDRESS'] = BS_ADDRESSx
 
     smeta_paths = get_smeta(data) if len(get_smeta(data)) > 0 else [""]
+    combined_smeta_files = []
 
     for smeta_path in smeta_paths:
         if "atp" in tmpl_type:
@@ -563,6 +570,16 @@ def create_files(folder, data, tmpl_type, have_smeta=False, index=""):
             output_path = folder + "/" + file_name__ATP + ".docx"
             template_ATP.save(output_path)
             if smeta_path != "" and data['BS_NAME'] in smeta_path:
-                combine_docx(output_path, smeta_path, output_path, is_second=False, is_atp=False)
+                combined_smeta_files.append(smeta_path)
+                combine_docx(output_path, smeta_path, output_path, is_second=False, is_atp=True)
+                ADD_END("ATP", output_path, output_path, data)
                 break
+            elif len(combined_smeta_files) == 0 and len(smeta_paths) > 0 and "" not in smeta_paths:
+                bs_name = data['BS_NAME'].split(" – ")
+                for bs in bs_name:
+                    if bs in smeta_path:
+                        combined_smeta_files.append(smeta_path)
+                        combine_docx(output_path, smeta_path, output_path, is_second=False, is_atp=True)
+                        ADD_END("ATP", output_path, output_path, data)
+                        break
             ADD_END("ATP", output_path, output_path, data)
